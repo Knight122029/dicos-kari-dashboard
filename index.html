@@ -4939,10 +4939,8 @@ DATA = {
         "督导/门店",
         "卡日商·当日",
         "卡日商·去年同日",
-        "卡日商·同比",
-        "付费卡可转化TC·当日",
-        "付费卡可转化TC·去年同日",
-        "付费卡可转化TC·同比"
+        "卡日商·差异",
+        "付费卡可转化TC·当日"
       ],
       "kpiLabels": {
         "cur": "卡日商 当日 (07-29)",
@@ -9715,10 +9713,8 @@ DATA = {
         "督导/门店",
         "卡日商·本周",
         "卡日商·上周",
-        "卡日商·周环比",
-        "付费卡可转化TC·本周",
-        "付费卡可转化TC·上周",
-        "付费卡可转化TC·周环比"
+        "卡日商·周环比差异",
+        "付费卡可转化TC·本周"
       ],
       "kpiLabels": {
         "cur": "卡日商 本周",
@@ -14791,10 +14787,8 @@ DATA = {
         "督导/门店",
         "卡日商·当月累计",
         "卡日商·去年同期",
-        "卡日商·同比",
-        "付费卡可转化TC·当月累计",
-        "付费卡可转化TC·去年同期",
-        "付费卡可转化TC·同比"
+        "卡日商·差异",
+        "付费卡可转化TC·当月累计"
       ],
       "kpiLabels": {
         "cur": "卡日商 当月累计 (2026-07)",
@@ -35216,15 +35210,15 @@ function renderDrill(){
 
   // Qudu table - clickable rows
   const drillCells = (o) => {
-    const g = o.growth, cg = o.conv_growth;
+    // 卡日商第4列：直接呈现「当期 - 对比期」的绝对差异数（不再显示成长/衰退比例）
+    const diff = (o.cur != null && o.cmp != null) ? (o.cur - o.cmp) : null;
+    const diffStr = diff == null ? '—' : ((diff >= 0 ? '+' : '') + diff.toFixed(1));
     return [
       `<td data-label="${cols[0]}">${o.name}</td>`,
       `<td data-label="${cols[1]}">${fmt(o.cur)}</td>`,
       `<td data-label="${cols[2]}">${fmt(o.cmp)}</td>`,
-      `<td data-label="${cols[3]}" class="${wowCls(g)}">${arrow(g)} ${pct(g)}</td>`,
+      `<td data-label="${cols[3]}" class="${wowCls(diff)}">${diff == null ? '—' : (arrow(diff) + ' ' + diffStr)}</td>`,
       `<td data-label="${cols[4]}" class="sep">${fmt(o.conv_cur)}</td>`,
-      `<td data-label="${cols[5]}">${fmt(o.conv_cmp)}</td>`,
-      `<td data-label="${cols[6]}" class="${wowCls(cg)}">${arrow(cg)} ${pct(cg)}</td>`,
     ].join('');
   };
   const qb = document.querySelector('#quduTable tbody');
