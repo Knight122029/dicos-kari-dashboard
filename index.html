@@ -31977,8 +31977,9 @@ function renderDivChart(p){
   const ctx = document.getElementById('divChart').getContext('2d');
   if(divChart) divChart.destroy();
 
-  const arrowPlugin = {
-    id: 'divArrow',
+  // 差异标注：两根竖线从柱顶向上 + 水平线连接 + 中间显示绝对差额
+  const diffPlugin = {
+    id: 'divDiff',
     afterDatasetsDraw(chart){
       const {ctx} = chart;
       const meta0 = chart.getDatasetMeta(0);
@@ -31990,53 +31991,40 @@ function renderDivChart(p){
       ctx.font = 'bold 11px -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      const pad = 4, as = 4; // pad 边距, as 箭头大小
+      const pad = 6;   // 柱顶到水平线的间距
       for(let i=0;i<d0.length;i++){
         const b0 = meta0.data[i], b1 = meta1.data[i];
         if(!b0 || !b1) continue;
         const v0 = d0[i], v1 = d1[i];
-        if(!v1) continue;
-        const growth = (v0 - v1) / v1;
-        const pct = (growth>=0?'+':'') + (growth*100).toFixed(2) + '%';
-        const up = v0 >= v1;
+        if(v0==null || v1==null) continue;
+        const diff = v0 - v1;
+        const up = diff >= 0;
         const color = up ? '#23c552' : '#ff5b6e';
-        const topY = Math.min(b0.y, b1.y) - pad;
-        const botY = Math.max(b0.y, b1.y) - pad;
+        const bracketY = Math.min(b0.y, b1.y) - pad; // 水平线在较高柱顶上方
         const cx = (b0.x + b1.x) / 2;
-        // 竖线
+        // 画两根竖线 + 水平连线（方括号形状）
         ctx.strokeStyle = color;
-        ctx.lineWidth = 1.2;
+        ctx.lineWidth = 1.3;
         ctx.beginPath();
-        ctx.moveTo(cx, topY);
-        ctx.lineTo(cx, botY);
+        ctx.moveTo(b0.x, b0.y);       // 当期柱顶
+        ctx.lineTo(b0.x, bracketY);   // 向上
+        ctx.lineTo(b1.x, bracketY);   // 水平连接
+        ctx.lineTo(b1.x, b1.y);       // 向下到对比期柱顶
         ctx.stroke();
-        // 箭头：指向当期（v0）方向，即从对比期(v1)柱顶指向当期柱顶
-        ctx.fillStyle = color;
-        ctx.beginPath();
-        if(up){
-          ctx.moveTo(cx - as, topY + as);
-          ctx.lineTo(cx, topY);
-          ctx.lineTo(cx + as, topY + as);
-        }else{
-          ctx.moveTo(cx - as, botY - as);
-          ctx.lineTo(cx, botY);
-          ctx.lineTo(cx + as, botY - as);
-        }
-        ctx.fill();
-        // 标签背景
-        const tw = ctx.measureText(pct).width + 8;
-        const th = 14;
-        const ty = (topY + botY) / 2;
-        ctx.fillStyle = 'rgba(15,20,32,0.9)';
+        // 差额标签
+        const diffText = (diff>=0?'+':'') + Math.round(diff).toLocaleString('zh-CN');
+        const tw = ctx.measureText(diffText).width + 10;
+        const th = 16;
+        const ty = bracketY - th/2 - 3;
+        ctx.fillStyle = 'rgba(15,20,32,0.92)';
         ctx.strokeStyle = color;
         ctx.lineWidth = 0.8;
         ctx.beginPath();
         ctx.rect(cx - tw/2, ty - th/2, tw, th);
         ctx.fill();
         ctx.stroke();
-        // 标签文字
         ctx.fillStyle = color;
-        ctx.fillText(pct, cx, ty + 0.5);
+        ctx.fillText(diffText, cx, ty);
       }
       ctx.restore();
     }
@@ -32047,9 +32035,10 @@ function renderDivChart(p){
       {label:p.label, data:divs.map(d=>d.cur), backgroundColor:'#4f8cff'},
       {label:'对比期', data:divs.map(d=>d.cmp), backgroundColor:'#5b6b8c'}
     ]},options:{responsive:true,maintainAspectRatio:false,
+      layout:{padding:{top:28}},
       plugins:{legend:{labels:{color:'#9aa7c2'}}},
       scales:{x:{ticks:{color:'#9aa7c2',font:{size:10}},grid:{color:'#2a3550'}},
-              y:{ticks:{color:'#9aa7c2',callback:v=>Math.round(v)},grid:{color:'#2a3550'}}}}, plugins:[arrowPlugin]});
+              y:{ticks:{color:'#9aa7c2',callback:v=>Math.round(v)},grid:{color:'#2a3550'}}}}, plugins:[diffPlugin]});
 }
 
 function renderTrendChart(p){
