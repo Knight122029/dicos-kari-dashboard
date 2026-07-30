@@ -31976,6 +31976,72 @@ function renderDivChart(p){
   document.getElementById('divChartHint').textContent = ' ' + p.label;
   const ctx = document.getElementById('divChart').getContext('2d');
   if(divChart) divChart.destroy();
+
+  const arrowPlugin = {
+    id: 'divArrow',
+    afterDatasetsDraw(chart){
+      const {ctx} = chart;
+      const meta0 = chart.getDatasetMeta(0);
+      const meta1 = chart.getDatasetMeta(1);
+      if(!meta0 || !meta1 || meta0.data.length===0) return;
+      const d0 = chart.data.datasets[0].data;
+      const d1 = chart.data.datasets[1].data;
+      ctx.save();
+      ctx.font = 'bold 11px -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const pad = 4, as = 4; // pad 边距, as 箭头大小
+      for(let i=0;i<d0.length;i++){
+        const b0 = meta0.data[i], b1 = meta1.data[i];
+        if(!b0 || !b1) continue;
+        const v0 = d0[i], v1 = d1[i];
+        if(!v1) continue;
+        const growth = (v0 - v1) / v1;
+        const pct = (growth>=0?'+':'') + (growth*100).toFixed(2) + '%';
+        const up = v0 >= v1;
+        const color = up ? '#23c552' : '#ff5b6e';
+        const topY = Math.min(b0.y, b1.y) - pad;
+        const botY = Math.max(b0.y, b1.y) - pad;
+        const cx = (b0.x + b1.x) / 2;
+        // 竖线
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(cx, topY);
+        ctx.lineTo(cx, botY);
+        ctx.stroke();
+        // 箭头：指向当期（v0）方向，即从对比期(v1)柱顶指向当期柱顶
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        if(up){
+          ctx.moveTo(cx - as, topY + as);
+          ctx.lineTo(cx, topY);
+          ctx.lineTo(cx + as, topY + as);
+        }else{
+          ctx.moveTo(cx - as, botY - as);
+          ctx.lineTo(cx, botY);
+          ctx.lineTo(cx + as, botY - as);
+        }
+        ctx.fill();
+        // 标签背景
+        const tw = ctx.measureText(pct).width + 8;
+        const th = 14;
+        const ty = (topY + botY) / 2;
+        ctx.fillStyle = 'rgba(15,20,32,0.9)';
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 0.8;
+        ctx.beginPath();
+        ctx.rect(cx - tw/2, ty - th/2, tw, th);
+        ctx.fill();
+        ctx.stroke();
+        // 标签文字
+        ctx.fillStyle = color;
+        ctx.fillText(pct, cx, ty + 0.5);
+      }
+      ctx.restore();
+    }
+  };
+
   divChart = new Chart(ctx,{type:'bar',data:{labels:divs.map(d=>d.division),
     datasets:[
       {label:p.label, data:divs.map(d=>d.cur), backgroundColor:'#4f8cff'},
@@ -31983,7 +32049,7 @@ function renderDivChart(p){
     ]},options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{labels:{color:'#9aa7c2'}}},
       scales:{x:{ticks:{color:'#9aa7c2',font:{size:10}},grid:{color:'#2a3550'}},
-              y:{ticks:{color:'#9aa7c2',callback:v=>Math.round(v)},grid:{color:'#2a3550'}}}}});
+              y:{ticks:{color:'#9aa7c2',callback:v=>Math.round(v)},grid:{color:'#2a3550'}}}}, plugins:[arrowPlugin]});
 }
 
 function renderTrendChart(p){
