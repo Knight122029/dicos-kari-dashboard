@@ -31977,7 +31977,7 @@ function renderDivChart(p){
   const ctx = document.getElementById('divChart').getContext('2d');
   if(divChart) divChart.destroy();
 
-  // 差异标注：两根竖线从柱顶向上 + 水平线连接 + 中间显示绝对差额
+  // 差异标注：胶囊标签 + 单箭头指向较矮的柱子，显示绝对值差额
   const diffPlugin = {
     id: 'divDiff',
     afterDatasetsDraw(chart){
@@ -31988,43 +31988,74 @@ function renderDivChart(p){
       const d0 = chart.data.datasets[0].data;
       const d1 = chart.data.datasets[1].data;
       ctx.save();
-      ctx.font = 'bold 11px -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif';
+      ctx.font = 'bold 12px -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      const pad = 6;   // 柱顶到水平线的间距
+
       for(let i=0;i<d0.length;i++){
         const b0 = meta0.data[i], b1 = meta1.data[i];
         if(!b0 || !b1) continue;
         const v0 = d0[i], v1 = d1[i];
         if(v0==null || v1==null) continue;
         const diff = v0 - v1;
+        if(diff === 0) continue; // 持平不标注
+
         const up = diff >= 0;
         const color = up ? '#23c552' : '#ff5b6e';
-        const bracketY = Math.min(b0.y, b1.y) - pad; // 水平线在较高柱顶上方
-        const cx = (b0.x + b1.x) / 2;
-        // 画两根竖线 + 水平连线（方括号形状）
+        // 找出较矮的柱子（y更大 = 顶端位置更高 = 柱子越矮）
+        const shortBar = (b0.y > b1.y) ? b0 : b1;
+        const shortTopY = shortBar.y;
+        const shortX = shortBar.x;
+
+        // 胶囊内容：绝对差额，带正负号
+        const absDiff = Math.abs(Math.round(diff));
+        const diffText = (up?'+':'-') + absDiff.toLocaleString('zh-CN');
+
+        // 胶囊尺寸
+        const tw = ctx.measureText(diffText).width + 16;
+        const th = 22;
+        const cx = (b0.x + b1.x) / 2; // 水平居中于两根柱子之间
+        const topY = Math.min(b0.y, b1.y) - 16; // 胶囊中心，在较高柱顶上方
+        const pillX = cx - tw/2;
+        const pillY = topY - th/2;
+
+        // 画圆角矩形胶囊（手绘圆角确保兼容）
+        ctx.fillStyle = 'rgba(15,20,32,0.95)';
         ctx.strokeStyle = color;
-        ctx.lineWidth = 1.3;
+        ctx.lineWidth = 1.4;
+        const r = 11;
         ctx.beginPath();
-        ctx.moveTo(b0.x, b0.y);       // 当期柱顶
-        ctx.lineTo(b0.x, bracketY);   // 向上
-        ctx.lineTo(b1.x, bracketY);   // 水平连接
-        ctx.lineTo(b1.x, b1.y);       // 向下到对比期柱顶
-        ctx.stroke();
-        // 差额标签
-        const diffText = (diff>=0?'+':'') + Math.round(diff).toLocaleString('zh-CN');
-        const tw = ctx.measureText(diffText).width + 10;
-        const th = 16;
-        const ty = bracketY - th/2 - 3;
-        ctx.fillStyle = 'rgba(15,20,32,0.92)';
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 0.8;
-        ctx.beginPath();
-        ctx.rect(cx - tw/2, ty - th/2, tw, th);
+        ctx.moveTo(pillX + r, pillY);
+        ctx.lineTo(pillX + tw - r, pillY);
+        ctx.arcTo(pillX + tw, pillY, pillX + tw, pillY + r, r);
+        ctx.lineTo(pillX + tw, pillY + th - r);
+        ctx.arcTo(pillX + tw, pillY + th, pillX + tw - r, pillY + th, r);
+        ctx.lineTo(pillX + r, pillY + th);
+        ctx.arcTo(pillX, pillY + th, pillX, pillY + th - r, r);
+        ctx.lineTo(pillX, pillY + r);
+        ctx.arcTo(pillX, pillY, pillX + r, pillY, r);
+        ctx.closePath();
         ctx.fill();
         ctx.stroke();
+        // 胶囊文字
         ctx.fillStyle = color;
-        ctx.fillText(diffText, cx, ty);
+        ctx.fillText(diffText, cx, topY);
+
+        // 箭头线：从胶囊底部向下到较矮柱顶
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.moveTo(shortX, pillY + th - 1);
+        ctx.lineTo(shortX, shortTopY - 5);
+        ctx.stroke();
+        // 箭头三角（指向下）
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(shortX - 5, shortTopY - 9);
+        ctx.lineTo(shortX + 5, shortTopY - 9);
+        ctx.lineTo(shortX, shortTopY - 1);
+        ctx.closePath();
+        ctx.fill();
       }
       ctx.restore();
     }
@@ -32035,7 +32066,7 @@ function renderDivChart(p){
       {label:p.label, data:divs.map(d=>d.cur), backgroundColor:'#4f8cff'},
       {label:'对比期', data:divs.map(d=>d.cmp), backgroundColor:'#5b6b8c'}
     ]},options:{responsive:true,maintainAspectRatio:false,
-      layout:{padding:{top:28}},
+      layout:{padding:{top:34}},
       plugins:{legend:{labels:{color:'#9aa7c2'}}},
       scales:{x:{ticks:{color:'#9aa7c2',font:{size:10}},grid:{color:'#2a3550'}},
               y:{ticks:{color:'#9aa7c2',callback:v=>Math.round(v)},grid:{color:'#2a3550'}}}}, plugins:[diffPlugin]});
