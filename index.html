@@ -89,11 +89,14 @@
   .table-scroll{width:100%;}
 
   /* Tables - desktop */
-  .table-scroll{max-height:400px;overflow:auto;-webkit-overflow-scrolling:touch;}
+  .table-scroll{max-height:400px;overflow:auto;-webkit-overflow-scrolling:touch;
+    /* 隐去丑陋的滚动条，但保留滚轮/触摸滚动能力 */
+    scrollbar-width:none;-ms-overflow-style:none;}
+  .table-scroll::-webkit-scrollbar{display:none;width:0;height:0;}
   table{width:100%;border-collapse:collapse;font-size:clamp(11px,2.3vw,13px);}
   th,td{padding:clamp(7px,1.8vw,9px) clamp(6px,1.8vw,10px);text-align:right;border-bottom:1px solid var(--line);white-space:nowrap;}
-  /* 下钻表：卡日商块 与 堂食可转化TC块 之间的分隔线 */
-  th.sep, td.sep{border-left:2px solid var(--accent);}
+  /* 下钻表：卡日商块 与 堂食可转化TC块 之间的分隔线（弱化：细 1px 淡蓝，不再突兀） */
+  th.sep, td.sep{border-left:1px solid rgba(79,140,255,0.28);}
   /* 下钻表更紧凑，列更窄，避免横向滑块；表头文字允许换行 */
   .drill table{font-size:clamp(10px,2vw,12px);}
   .drill th, .drill td{padding:6px 7px;}
@@ -35222,23 +35225,34 @@ function renderDrill(){
   storeThead.innerHTML = '<tr>'+thHtml+'</tr>';
 
   // Qudu table - clickable rows
-  const drillCells = (o) => {
+  // convVal：返回可参与热度计算的数值（负数/空 视为 0）
+  const convVal = o => (o.conv_cur == null ? 0 : (o.conv_cur < 0 ? 0 : o.conv_cur));
+  const drillCells = (o, convMax) => {
     // 卡日商第4列：直接呈现「当期 - 对比期」的绝对差异数（不再显示成长/衰退比例）
     const diff = (o.cur != null && o.cmp != null) ? (o.cur - o.cmp) : null;
     const diffStr = diff == null ? '—' : ((diff >= 0 ? '+' : '') + diff.toFixed(1));
-    // 堂食可转化TC：负数统一按 0 显示
-    const convDisp = (o.conv_cur == null) ? '—' : (o.conv_cur < 0 ? 0 : o.conv_cur);
+    // 堂食可转化TC：负数统一按 0 显示；数字越大红色越深、并加粗以提醒重视
+    const cRaw = convVal(o);
+    const convDisp = (o.conv_cur == null) ? '—' : cRaw;
+    let convStyle = 'font-weight:700;';
+    if(o.conv_cur != null && convMax > 0){
+      const t = Math.min(1, cRaw / convMax);     // 0~1，越大越红
+      const a = (t * 0.9).toFixed(3);
+      convStyle += `background:rgba(255,91,110,${a});`;
+      if(t > 0.45) convStyle += 'color:#fff;';    // 红底够深时转白字保证可读
+    }
     return [
       `<td data-label="${cols[0]}">${o.name}</td>`,
       `<td data-label="${cols[1]}">${fmt(o.cur)}</td>`,
       `<td data-label="${cols[2]}">${fmt(o.cmp)}</td>`,
       `<td data-label="${cols[3]}" class="${wowCls(diff)}">${diff == null ? '—' : (arrow(diff) + ' ' + diffStr)}</td>`,
-      `<td data-label="${cols[4]}" class="sep">${fmt(convDisp)}</td>`,
+      `<td data-label="${cols[4]}" class="sep" style="${convStyle}">${fmt(convDisp)}</td>`,
     ].join('');
   };
+  const quduMax = info.qudu.reduce((m,o)=>Math.max(m, convVal(o)), 0);
   const qb = document.querySelector('#quduTable tbody');
   qb.innerHTML = info.qudu.map(q=>
-    `<tr data-qu="${q.name}"${currentQuFilter===q.name?' class="qu-active"':''}>`+drillCells(q)+'</tr>'
+    `<tr data-qu="${q.name}"${currentQuFilter===q.name?' class="qu-active"':''}>`+drillCells(q, quduMax)+'</tr>'
   ).join('');
 
   // Add click handlers for qudu rows
@@ -35269,8 +35283,9 @@ function renderDrill(){
     storeTitle.textContent = '单门店榜（Top 60）';
   }
 
+  const storeMax = stores.reduce((m,o)=>Math.max(m, convVal(o)), 0);
   const sb = document.querySelector('#storeTable tbody');
-  sb.innerHTML = stores.slice(0,60).map(s=> '<tr>'+drillCells(s)+'</tr>').join('');
+  sb.innerHTML = stores.slice(0,60).map(s=> '<tr>'+drillCells(s, storeMax)+'</tr>').join('');
 }
 </script>
 </body>
