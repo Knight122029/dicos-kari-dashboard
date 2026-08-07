@@ -48143,21 +48143,16 @@ function renderStoreTrend(){
 
   const vCur = winDates.map(x => byDate[x] ? byDate[x].ka : null);
   const vConv = winDates.map(x => byDate[x] ? byDate[x].conv : null);
-  let vCmp, vConvCmp;
+  let vCmp;
   if(currentPeriod === 'week'){
     // 当周对比 = 上周同星期(2026)，与整体趋势口径一致(WoW)
     vCmp = winDates.map(x=>{
       const xd = new Date(x + 'T00:00:00'); const lw = new Date(xd); lw.setDate(xd.getDate()-7);
       const lwd = fd(lw); return byDate[lwd] ? byDate[lwd].ka : null;
     });
-    vConvCmp = winDates.map(x=>{
-      const xd = new Date(x + 'T00:00:00'); const lw = new Date(xd); lw.setDate(xd.getDate()-7);
-      const lwd = fd(lw); return byDate[lwd] ? byDate[lwd].conv : null;
-    });
   } else {
     // 当日/当月对比 = 去年同期同MM-DD(YoY)
     vCmp = winDates.map(x => byDate[x] ? byDate[x].ka25 : null);
-    vConvCmp = winDates.map(x => byDate[x] ? byDate[x].conv25 : null);
   }
 
   document.getElementById('storeTrendTitle').textContent =
@@ -48176,9 +48171,7 @@ function renderStoreTrend(){
           fill: false, tension: .3, pointRadius: 3, pointHoverRadius: 6, spanGaps: true },
         { label: '可转化TC·当年 ' + label, data: vConv, borderColor: '#2ecc71', yAxisID: 'y1',
           backgroundColor: 'rgba(46,204,113,.10)', fill: true, tension: .3,
-          pointRadius: 3, pointHoverRadius: 6, spanGaps: true },
-        { label: '可转化TC·' + cmpLabel, data: vConvCmp, borderColor: '#e15bef', yAxisID: 'y1', borderDash: [5,4],
-          fill: false, tension: .3, pointRadius: 3, pointHoverRadius: 6, spanGaps: true }
+          pointRadius: 3, pointHoverRadius: 6, spanGaps: true }
       ] },
     options: { responsive: true, maintainAspectRatio: false,
       plugins: { legend: { labels: { color: '#9aa7c2' } } },
