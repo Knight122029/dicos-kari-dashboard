@@ -57629,68 +57629,85 @@ function renderTrendChart(p){
 }
 
 function renderDrill(){
-  const drill = document.getElementById('drill');
-  if(currentDivFilter === '__ALL__'){
-    drill.style.display = 'none';
-    return;
-  }
   const p = DATA.periods[currentPeriod];
-  const info = p.drill[currentDivFilter];
-  if(!info){
-    drill.style.display = 'none';
-    return;
+  const drill = document.getElementById('drill');
+  const allDivs = currentDivFilter === '__ALL__';
+
+  let info, title;
+  if(allDivs){
+    // 全部事业部：合并所有区督导 + 所有门店，打上 div 标记
+    const allQudu = [], allStores = [];
+    for(const dv in p.drill){
+      const d = p.drill[dv];
+      d.qudu.forEach(q => allQudu.push({...q, div: dv}));
+      d.stores.forEach(s => allStores.push({...s, div: dv}));
+    }
+    allQudu.sort((a,b) => (b.cur||0) - (a.cur||0));
+    allStores.sort((a,b) => Math.max(b.conv_cur||0,0) - Math.max(a.conv_cur||0,0) || (b.cur||0) - (a.cur||0));
+    info = {qudu: allQudu, stores: allStores};
+    title = '全部事业部 · '+p.label+' 区督导排名';
+  } else {
+    if(!p.drill[currentDivFilter]){
+      drill.style.display = 'none';
+      return;
+    }
+    info = p.drill[currentDivFilter];
+    title = '事业部：'+currentDivFilter+' · '+p.label+' 卡日商 下钻';
   }
   drill.style.display = 'block';
-  document.getElementById('drillTitle').textContent = '事业部：'+currentDivFilter+' · '+p.label+' 卡日商 下钻';
+  document.getElementById('drillTitle').textContent = title;
 
-  const cols = p.cols;
-  // Build table headers (第5列=堂食可转化TC块起始，两行显示 + 分隔线)
+  // 表头：全部事业部时多一列「事业部」
+  const baseCols = p.cols;
+  const cols = allDivs ? ['事业部', ...baseCols] : baseCols;
   const thHtml = cols.map((c,i)=>{
-    if(i===4) return `<th class="sep conv-h">堂食<br>可转化TC</th>`;
+    if(allDivs && i===0) return `<th>事业部</th>`;
+    const convIdx = allDivs ? 5 : 4;
+    if(i===convIdx) return `<th class="sep conv-h">堂食<br>可转化TC</th>`;
     return `<th>${c}</th>`;
   }).join('');
-  const quduThead = document.querySelector('#quduTable thead');
-  quduThead.innerHTML = '<tr>'+thHtml+'</tr>';
-  const storeThead = document.querySelector('#storeTable thead');
-  storeThead.innerHTML = '<tr>'+thHtml+'</tr>';
+  document.querySelector('#quduTable thead').innerHTML = '<tr>'+thHtml+'</tr>';
+  document.querySelector('#storeTable thead').innerHTML = '<tr>'+thHtml+'</tr>';
 
-  // Qudu table - clickable rows
   // convVal：返回可参与热度计算的数值（负数/空 视为 0）
   const convVal = o => (o.conv_cur == null ? 0 : (o.conv_cur < 0 ? 0 : o.conv_cur));
   const drillCells = (o, convMax) => {
-    // 卡日商第4列：直接呈现「当期 - 对比期」的绝对差异数（不再显示成长/衰退比例）
     const diff = (o.cur != null && o.cmp != null) ? (o.cur - o.cmp) : null;
     const diffStr = diff == null ? '—' : ((diff >= 0 ? '+' : '') + diff.toFixed(1));
-    // 堂食可转化TC：负数统一按 0 显示；数字越大红色越深、并加粗以提醒重视
     const cRaw = convVal(o);
     const convDisp = (o.conv_cur == null) ? '—' : cRaw;
     let convStyle = 'font-weight:700;';
     if(o.conv_cur != null && convMax > 0){
-      const t = Math.min(1, cRaw / convMax);     // 0~1，越大越红
+      const t = Math.min(1, cRaw / convMax);
       const a = (t * 0.9).toFixed(3);
       convStyle += `background:rgba(255,91,110,${a});`;
-      if(t > 0.45) convStyle += 'color:#fff;';    // 红底够深时转白字保证可读
+      if(t > 0.45) convStyle += 'color:#fff;';
     }
-    return [
-      `<td data-label="${cols[0]}">${o.name}</td>`,
-      `<td data-label="${cols[1]}">${fmt(o.cur)}</td>`,
-      `<td data-label="${cols[2]}">${fmt(o.cmp)}</td>`,
-      `<td data-label="${cols[3]}" class="${wowCls(diff)}">${diff == null ? '—' : (arrow(diff) + ' ' + diffStr)}</td>`,
-      `<td data-label="${cols[4]}" class="sep" style="${convStyle}">${fmt(convDisp)}</td>`,
-    ].join('');
+    // 数据列用 baseCols 取名称（不受事业部列偏移影响），事业部列在 allDivs 时单独前置
+    let cells = [
+      `<td data-label="${baseCols[0]}">${o.name}</td>`,
+      `<td data-label="${baseCols[1]}">${fmt(o.cur)}</td>`,
+      `<td data-label="${baseCols[2]}">${fmt(o.cmp)}</td>`,
+      `<td data-label="${baseCols[3]}" class="${wowCls(diff)}">${diff == null ? '—' : (arrow(diff) + ' ' + diffStr)}</td>`,
+      `<td data-label="${baseCols[4]}" class="sep" style="${convStyle}">${fmt(convDisp)}</td>`,
+    ];
+    if(allDivs && o.div) cells.unshift(`<td data-label="事业部">${o.div}</td>`);
+    return cells.join('');
   };
+
+  // Qudu table
   const quduMax = info.qudu.reduce((m,o)=>Math.max(m, convVal(o)), 0);
   const qb = document.querySelector('#quduTable tbody');
   qb.innerHTML = info.qudu.map(q=>
-    `<tr data-qu="${q.name}"${currentQuFilter===q.name?' class="qu-active"':''}>`+drillCells(q, quduMax)+'</tr>'
+    `<tr data-qu="${q.name}"${!allDivs && currentQuFilter===q.name?' class="qu-active"':''}>`+drillCells(q, quduMax)+'</tr>'
   ).join('');
 
-  // Add click handlers for qudu rows
+  // Qudu click：全部事业部时不支持区督导筛选（点无反应）
   qb.querySelectorAll('tr').forEach(tr=>{
     tr.addEventListener('click',()=>{
+      if(allDivs) return;
       const quName = tr.dataset.qu;
       if(currentQuFilter === quName){
-        // Click again to deselect
         currentQuFilter = null;
       } else {
         currentQuFilter = quName;
@@ -57699,10 +57716,10 @@ function renderDrill(){
     });
   });
 
-  // Store table - filter by qu if selected
+  // Store table
   let stores = info.stores;
   const storeTitle = document.getElementById('storeTitle');
-  if(currentQuFilter){
+  if(!allDivs && currentQuFilter){
     stores = stores.filter(s=>s.qu === currentQuFilter);
     storeTitle.innerHTML = `单门店榜 · ${currentQuFilter}（${stores.length}家 · 按可转化TC降序） <span class="qu-reset">显示全部</span>`;
     storeTitle.querySelector('.qu-reset').addEventListener('click',()=>{
@@ -57710,7 +57727,8 @@ function renderDrill(){
       renderDrill();
     });
   } else {
-    storeTitle.textContent = '单门店榜（按可转化TC降序 · Top 60，优先呈现需重点管理执行的门店）';
+    const prefix = allDivs ? '全' : '单';
+    storeTitle.textContent = prefix + '门店榜（按可转化TC降序 · Top 60' + (allDivs ? '' : '，优先呈现需重点管理执行的门店') + '）';
   }
 
   const storeMax = stores.reduce((m,o)=>Math.max(m, convVal(o)), 0);
@@ -57719,7 +57737,7 @@ function renderDrill(){
     '<tr data-id="'+s.id+'" class="store-row'+(selectedStoreId===s.id?' store-active':'')+'">'+drillCells(s, storeMax)+'</tr>'
   ).join('');
 
-  // 单店趋势图：点击店名行 -> 显示/切换该店趋势
+  // 单店趋势图
   sb.querySelectorAll('tr.store-row').forEach(tr=>{
     tr.addEventListener('click', ()=>{
       const id = tr.dataset.id;
@@ -57734,7 +57752,6 @@ function renderDrill(){
     });
   });
 
-  // 若已选中某店，保持趋势图显示并随周期刷新
   if(selectedStoreId){
     document.getElementById('storeTrendPanel').style.display='block';
     renderStoreTrend();
